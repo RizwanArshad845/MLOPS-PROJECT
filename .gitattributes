@@ -1,3 +1,4 @@
 * text=auto eol=lf
 *.png binary
 *.parquet binary
+reports/** -text

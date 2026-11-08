@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -19,6 +20,10 @@ MODELS = ROOT / "models"
 REPORTS = ROOT / "reports"
 
 load_dotenv(ROOT / ".env")
+# Windows consoles default to cp1252; MLflow prints emoji and would crash the stage
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 

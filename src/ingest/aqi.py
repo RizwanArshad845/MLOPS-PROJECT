@@ -40,24 +40,35 @@ def _openaq_sensor_ids(s, p: dict) -> list[int]:
         "coordinates": f"{loc['latitude']},{loc['longitude']}",
         "radius": loc["openaq_radius_m"], "parameters_id": PM25_PARAMETER_ID, "limit": 100,
     })
-    ids = [sen["id"] for l in js.get("results", []) for sen in l.get("sensors", [])
+    start = pd.Timestamp(p["data"]["start_date"], tz="UTC")
+    end = pd.Timestamp(p["data"]["end_date"], tz="UTC") + pd.Timedelta(days=1)
+
+    def active(l: dict) -> bool:  # location reported during the requested period
+        first = (l.get("datetimeFirst") or {}).get("utc")
+        last = (l.get("datetimeLast") or {}).get("utc")
+        return bool(first and last) and pd.Timestamp(first) < end and pd.Timestamp(last) >= start
+
+    locs = [l for l in js.get("results", []) if active(l)]
+    ids = [sen["id"] for l in locs for sen in l.get("sensors", [])
            if sen.get("parameter", {}).get("id") == PM25_PARAMETER_ID]
-    log.info("OpenAQ: %d PM2.5 sensors near %s", len(ids), loc["city"])
+    log.info("OpenAQ: %d PM2.5 sensors active in period (%s)", len(ids), [l.get("name") for l in locs])
     return ids
 
 
 def _openaq_sensor_hours(s, sensor_id: int, start: str, end: str) -> pd.Series:
-    rows, page = [], 1
-    while True:
+    """Fetch month by month: deep pagination over a 2-year window times out (HTTP 408)."""
+    rows = []
+    months = pd.date_range(start, pd.Timestamp(end) + pd.Timedelta(days=1), freq="MS", inclusive="both")
+    bounds = [pd.Timestamp(start)] + [m for m in months if m > pd.Timestamp(start)] + \
+             [pd.Timestamp(end) + pd.Timedelta(days=1)]
+    for lo, hi in zip(bounds[:-1], bounds[1:]):
+        if lo >= hi:
+            continue
         js = get_json(s, f"{OPENAQ}/sensors/{sensor_id}/hours", {
-            "datetime_from": f"{start}T00:00:00Z", "datetime_to": f"{end}T23:59:59Z",
-            "limit": 1000, "page": page,
+            "datetime_from": lo.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "datetime_to": hi.strftime("%Y-%m-%dT%H:%M:%SZ"), "limit": 1000,
         })
-        res = js.get("results", [])
-        rows += [(r["period"]["datetimeFrom"]["utc"], r["value"]) for r in res]
-        if len(res) < 1000:
-            break
-        page += 1
+        rows += [(r["period"]["datetimeFrom"]["utc"], r["value"]) for r in js.get("results", [])]
         time.sleep(1.1)  # stay under the 60 req/min free-tier limit
     if not rows:
         return pd.Series(dtype=float)

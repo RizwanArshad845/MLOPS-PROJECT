@@ -8,7 +8,7 @@ TIMEOUT = 60
 
 def session(headers: dict | None = None) -> requests.Session:
     s = requests.Session()
-    retry = Retry(total=6, backoff_factor=2, status_forcelist=(429, 500, 502, 503, 504),
+    retry = Retry(total=6, backoff_factor=2, status_forcelist=(408, 429, 500, 502, 503, 504),
                   allowed_methods=("GET",), respect_retry_after_header=True)
     s.mount("https://", HTTPAdapter(max_retries=retry))
     s.headers.update({"User-Agent": "smogcast-mlops/1.0", **(headers or {})})

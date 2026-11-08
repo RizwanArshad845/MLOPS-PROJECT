@@ -1,0 +1,55 @@
+{
+  "aqi": {
+    "rows": 17544,
+    "checks": {
+      "schema_and_ranges": {
+        "passed": true
+      },
+      "null_fraction": {
+        "passed": true,
+        "per_column": {
+          "pm25": 0.0,
+          "pm25_openaq": 0.1097,
+          "pm25_openmeteo": 0.0,
+          "source": 0.0
+        }
+      },
+      "hourly_continuity": {
+        "passed": true,
+        "missing_hours": 0,
+        "monotonic": true
+      },
+      "stuck_sensor": {
+        "passed": true,
+        "longest_constant_run_h": 4
+      }
+    },
+    "passed": true
+  },
+  "weather": {
+    "rows": 17544,
+    "checks": {
+      "schema_and_ranges": {
+        "passed": true
+      },
+      "null_fraction": {
+        "passed": true,
+        "per_column": {
+          "temperature_2m": 0.0,
+          "relative_humidity_2m": 0.0,
+          "wind_speed_10m": 0.0,
+          "wind_direction_10m": 0.0,
+          "surface_pressure": 0.0,
+          "precipitation": 0.0
+        }
+      },
+      "hourly_continuity": {
+        "passed": true,
+        "missing_hours": 0,
+        "monotonic": true
+      }
+    },
+    "passed": true
+  },
+  "passed": true
+}

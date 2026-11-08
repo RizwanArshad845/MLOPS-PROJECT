@@ -1,0 +1,381 @@
+schema: '2.0'
+stages:
+  ingest_aqi:
+    cmd: python -m src.ingest.aqi
+    deps:
+    - path: src/ingest/aqi.py
+      hash: md5
+      md5: 96c824d20f3286eb7fd2943d6cc1b229
+      size: 4998
+    - path: src/ingest/http.py
+      hash: md5
+      md5: d7eb17bef60fb31a3491dbc00072ba33
+      size: 750
+    params:
+      params.yaml:
+        data.end_date: '2024-12-31'
+        data.start_date: '2023-01-01'
+        location:
+          city: Lahore
+          latitude: 31.5204
+          longitude: 74.3587
+          timezone: Asia/Karachi
+          openaq_radius_m: 25000
+    outs:
+    - path: data/raw/aqi.csv
+      hash: md5
+      md5: 7d25d65363c3ae2d2197bcb8b247b2a0
+      size: 876356
+    - path: reports/aqi_meta.json
+      hash: md5
+      md5: 7c6b6014c54609832f6f76a252305433
+      size: 93
+  ingest_weather:
+    cmd: python -m src.ingest.weather
+    deps:
+    - path: src/ingest/http.py
+      hash: md5
+      md5: d7eb17bef60fb31a3491dbc00072ba33
+      size: 750
+    - path: src/ingest/weather.py
+      hash: md5
+      md5: b9d40d81c02e53f5afbe038222ae3038
+      size: 1134
+    params:
+      params.yaml:
+        data:
+          start_date: '2023-01-01'
+          end_date: '2024-12-31'
+          weather_vars:
+          - temperature_2m
+          - relative_humidity_2m
+          - wind_speed_10m
+          - wind_direction_10m
+          - surface_pressure
+          - precipitation
+        location:
+          city: Lahore
+          latitude: 31.5204
+          longitude: 74.3587
+          timezone: Asia/Karachi
+          openaq_radius_m: 25000
+    outs:
+    - path: data/raw/weather.csv
+      hash: md5
+      md5: 230dbfa9a929683b7caebd20979ae11a
+      size: 927255
+  validate:
+    cmd: python -m src.validate.validate
+    deps:
+    - path: data/raw/aqi.csv
+      hash: md5
+      md5: 7d25d65363c3ae2d2197bcb8b247b2a0
+      size: 876356
+    - path: data/raw/weather.csv
+      hash: md5
+      md5: 230dbfa9a929683b7caebd20979ae11a
+      size: 927255
+    - path: src/validate/validate.py
+      hash: md5
+      md5: fcf58cd1a59441856d18d709b3a0873a
+      size: 3672
+    params:
+      params.yaml:
+        data:
+          start_date: '2023-01-01'
+          end_date: '2024-12-31'
+          weather_vars:
+          - temperature_2m
+          - relative_humidity_2m
+          - wind_speed_10m
+          - wind_direction_10m
+          - surface_pressure
+          - precipitation
+        validation:
+          max_null_frac: 0.1
+          max_stuck_hours: 24
+          ranges:
+            pm25:
+            - 0
+            - 1000
+            temperature_2m:
+            - -5
+            - 55
+            relative_humidity_2m:
+            - 0
+            - 100
+            wind_speed_10m:
+            - 0
+            - 150
+            wind_direction_10m:
+            - 0
+            - 360
+            surface_pressure:
+            - 900
+            - 1100
+            precipitation:
+            - 0
+            - 300
+    outs:
+    - path: reports/validation.json
+      hash: md5
+      md5: 27ff86d8228d7a0fa6fe59ae6b113a0c
+      size: 1182
+  featurize:
+    cmd: python -m src.features.build_features
+    deps:
+    - path: data/raw/aqi.csv
+      hash: md5
+      md5: 7d25d65363c3ae2d2197bcb8b247b2a0
+      size: 876356
+    - path: data/raw/weather.csv
+      hash: md5
+      md5: 230dbfa9a929683b7caebd20979ae11a
+      size: 927255
+    - path: reports/validation.json
+      hash: md5
+      md5: 27ff86d8228d7a0fa6fe59ae6b113a0c
+      size: 1182
+    - path: src/features/build_features.py
+      hash: md5
+      md5: 4614f60bb5e90c6efb0397164e4edf7c
+      size: 3043
+    - path: src/utils/common.py
+      hash: md5
+      md5: a21ec8845a7f43cfc73361016fe2c7b3
+      size: 3326
+    params:
+      params.yaml:
+        features:
+          max_interp_gap_hours: 6
+          lags:
+          - 1
+          - 2
+          - 3
+          - 6
+          - 12
+          - 24
+          - 48
+          rolling_windows:
+          - 6
+          - 24
+          horizons:
+          - 24
+          - 48
+        split:
+          train_end: 2024-06-30 23:00
+          val_end: 2024-09-30 23:00
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: 9bcc51795b46dc29f5b2a2173f32886d.dir
+      size: 1401249
+      nfiles: 4
+  train_baselines:
+    cmd: python -m src.models.tabular persistence ridge
+    deps:
+    - path: data/processed/test.parquet
+      hash: md5
+      md5: 958a1529d6ae5c9fd966fdcd9dcacaea
+      size: 159031
+    - path: data/processed/train.parquet
+      hash: md5
+      md5: 9441f1dd63f3a3deb87f6f31ade2e561
+      size: 741903
+    - path: data/processed/val.parquet
+      hash: md5
+      md5: 5985715eea3e9c7c52722947db055e44
+      size: 149473
+    - path: src/evaluate/metrics.py
+      hash: md5
+      md5: 6f9769bb2f2fea38b633239cc17bae9d
+      size: 1944
+    - path: src/models/tabular.py
+      hash: md5
+      md5: 2e030806ac764258ff0541ede0db4013
+      size: 3945
+    params:
+      params.yaml:
+        features.horizons:
+        - 24
+        - 48
+        ridge:
+          alpha: 1.0
+    outs:
+    - path: models/ridge_h24.joblib
+      hash: md5
+      md5: bacff52506d1b584cd3f7b9bfd2564e4
+      size: 2433
+    - path: models/ridge_h48.joblib
+      hash: md5
+      md5: 000ed9db5935bb5aa9b7e10ae7512558
+      size: 2433
+    - path: reports/metrics/persistence.json
+      hash: md5
+      md5: cef4dc156fd0d7a65e05147c662db471
+      size: 697
+    - path: reports/metrics/ridge.json
+      hash: md5
+      md5: 0061224ca7bc2f868ea83a75f4345e20
+      size: 708
+  train_gbm:
+    cmd: python -m src.models.tabular xgboost lightgbm
+    deps:
+    - path: data/processed/test.parquet
+      hash: md5
+      md5: 958a1529d6ae5c9fd966fdcd9dcacaea
+      size: 159031
+    - path: data/processed/train.parquet
+      hash: md5
+      md5: 9441f1dd63f3a3deb87f6f31ade2e561
+      size: 741903
+    - path: data/processed/val.parquet
+      hash: md5
+      md5: 5985715eea3e9c7c52722947db055e44
+      size: 149473
+    - path: src/evaluate/metrics.py
+      hash: md5
+      md5: 6f9769bb2f2fea38b633239cc17bae9d
+      size: 1944
+    - path: src/models/tabular.py
+      hash: md5
+      md5: 2e030806ac764258ff0541ede0db4013
+      size: 3945
+    params:
+      params.yaml:
+        features.horizons:
+        - 24
+        - 48
+        lightgbm:
+          n_estimators: 600
+          num_leaves: 31
+          learning_rate: 0.05
+          subsample: 0.8
+          colsample_bytree: 0.8
+          early_stopping_rounds: 50
+        xgboost:
+          n_estimators: 600
+          max_depth: 6
+          learning_rate: 0.05
+          subsample: 0.8
+          colsample_bytree: 0.8
+          early_stopping_rounds: 50
+    outs:
+    - path: models/lightgbm_h24.joblib
+      hash: md5
+      md5: 6f49a7e0fccf6326aaf3b81b7a755e9b
+      size: 123077
+    - path: models/lightgbm_h48.joblib
+      hash: md5
+      md5: bffa6d2c4fbdda6a158112fc644bb87a
+      size: 109535
+    - path: models/xgboost_h24.joblib
+      hash: md5
+      md5: f4ce38c7ef8b54c703df6248af0d0349
+      size: 421044
+    - path: models/xgboost_h48.joblib
+      hash: md5
+      md5: d06b2d441c97212dd574b335895e67ff
+      size: 435591
+    - path: reports/metrics/lightgbm.json
+      hash: md5
+      md5: 0cf42145d98ac5b79cbd02362c15c017
+      size: 707
+    - path: reports/metrics/xgboost.json
+      hash: md5
+      md5: 890334ecc9f7f86a6f092d60563bab1f
+      size: 710
+  train_patchtst:
+    cmd: python -m src.models.patchtst
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 9bcc51795b46dc29f5b2a2173f32886d.dir
+      size: 1401249
+      nfiles: 4
+    - path: src/evaluate/metrics.py
+      hash: md5
+      md5: 6f9769bb2f2fea38b633239cc17bae9d
+      size: 1944
+    - path: src/models/patchtst.py
+      hash: md5
+      md5: 3100841e8e6ac5e920206c71a62294d3
+      size: 7304
+    - path: src/models/patchtst_pyfunc.py
+      hash: md5
+      md5: 733cab2cc48e6a3423f3552304ea15f4
+      size: 1705
+    params:
+      params.yaml:
+        features.horizons:
+        - 24
+        - 48
+        patchtst:
+          context_length: 168
+          prediction_length: 48
+          patch_length: 16
+          patch_stride: 8
+          d_model: 64
+          num_attention_heads: 4
+          num_hidden_layers: 2
+          ffn_dim: 128
+          dropout: 0.1
+          batch_size: 64
+          epochs: 10
+          learning_rate: 0.001
+          train_stride: 1
+          seed: 42
+        split:
+          train_end: 2024-06-30 23:00
+          val_end: 2024-09-30 23:00
+    outs:
+    - path: models/patchtst
+      hash: md5
+      md5: 51b6fc85222486cf030d462afdce3b01.dir
+      size: 302334
+      nfiles: 3
+    - path: reports/metrics/patchtst.json
+      hash: md5
+      md5: 5b6ac5e4e3fead82812682aaa93e8c49
+      size: 712
+  evaluate:
+    cmd: python -m src.evaluate.evaluate
+    deps:
+    - path: reports/metrics/lightgbm.json
+      hash: md5
+      md5: 0cf42145d98ac5b79cbd02362c15c017
+      size: 707
+    - path: reports/metrics/patchtst.json
+      hash: md5
+      md5: 5b6ac5e4e3fead82812682aaa93e8c49
+      size: 712
+    - path: reports/metrics/persistence.json
+      hash: md5
+      md5: cef4dc156fd0d7a65e05147c662db471
+      size: 697
+    - path: reports/metrics/ridge.json
+      hash: md5
+      md5: 0061224ca7bc2f868ea83a75f4345e20
+      size: 708
+    - path: reports/metrics/xgboost.json
+      hash: md5
+      md5: 890334ecc9f7f86a6f092d60563bab1f
+      size: 710
+    - path: src/evaluate/evaluate.py
+      hash: md5
+      md5: 003e53e1fdfb901377f05029d23b7137
+      size: 2740
+    params:
+      params.yaml:
+        registry:
+          model_name: smogcast-patchtst
+          stage: Staging
+    outs:
+    - path: reports/comparison.csv
+      hash: md5
+      md5: bf87b3672089eb1533427c22bf2f78b1
+      size: 901
+    - path: reports/metrics.json
+      hash: md5
+      md5: ad3094ab991f79174627b46960ac6d24
+      size: 753

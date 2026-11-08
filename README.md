@@ -3,8 +3,9 @@
 SmogCast forecasts Lahore's Air Quality Index **24h and 48h ahead** from hourly PM2.5 and weather history.
 Milestone 1 is a fully reproducible core ML pipeline: ingestion → validation → features → baseline and main models → evaluation → model registry. It uses DVC for data/pipeline versioning and MLflow for experiment tracking, both hosted on **DagsHub** (free, no AWS).
 
-- **GitHub:** `<add link>`
-- **DagsHub (DVC remote + MLflow):** `<add link>`
+- **GitHub:** https://github.com/RizwanArshad845/MLOPS-PROJECT
+- **DagsHub (DVC remote):** https://dagshub.com/RizwanArshad845/ML_PRO
+- **MLflow tracking server:** https://dagshub.com/RizwanArshad845/ML_PRO.mlflow
 
 ## Pipeline
 
@@ -31,7 +32,7 @@ Metrics: MAE, RMSE, sMAPE and AQI-category accuracy per horizon. Every run logs 
 ## Setup
 
 ```bash
-git clone <repo-url> && cd smogcast
+git clone https://github.com/RizwanArshad845/MLOPS-PROJECT.git && cd MLOPS-PROJECT
 python -m venv .venv && .venv\Scripts\activate      # Windows (source .venv/bin/activate on Linux/macOS)
 pip install -r requirements.txt
 copy .env.example .env                              # then fill in the keys

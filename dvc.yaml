@@ -1,0 +1,130 @@
+stages:
+  ingest_aqi:
+    cmd: python -m src.ingest.aqi
+    deps:
+      - src/ingest/aqi.py
+      - src/ingest/http.py
+    params:
+      - location
+      - data.start_date
+      - data.end_date
+    outs:
+      - data/raw/aqi.csv
+      - reports/aqi_meta.json:
+          cache: false
+
+  ingest_weather:
+    cmd: python -m src.ingest.weather
+    deps:
+      - src/ingest/weather.py
+      - src/ingest/http.py
+    params:
+      - location
+      - data
+    outs:
+      - data/raw/weather.csv
+
+  validate:
+    cmd: python -m src.validate.validate
+    deps:
+      - src/validate/validate.py
+      - data/raw/aqi.csv
+      - data/raw/weather.csv
+    params:
+      - validation
+      - data
+    metrics:
+      - reports/validation.json:
+          cache: false
+
+  featurize:
+    cmd: python -m src.features.build_features
+    deps:
+      - src/features/build_features.py
+      - src/utils/common.py
+      - data/raw/aqi.csv
+      - data/raw/weather.csv
+      - reports/validation.json
+    params:
+      - features
+      - split
+    outs:
+      - data/processed
+
+  train_baselines:
+    cmd: python -m src.models.tabular persistence ridge
+    deps:
+      - src/models/tabular.py
+      - src/evaluate/metrics.py
+      - data/processed/train.parquet
+      - data/processed/val.parquet
+      - data/processed/test.parquet
+    params:
+      - ridge
+      - features.horizons
+    outs:
+      - models/ridge_h24.joblib
+      - models/ridge_h48.joblib
+    metrics:
+      - reports/metrics/persistence.json:
+          cache: false
+      - reports/metrics/ridge.json:
+          cache: false
+
+  train_gbm:
+    cmd: python -m src.models.tabular xgboost lightgbm
+    deps:
+      - src/models/tabular.py
+      - src/evaluate/metrics.py
+      - data/processed/train.parquet
+      - data/processed/val.parquet
+      - data/processed/test.parquet
+    params:
+      - xgboost
+      - lightgbm
+      - features.horizons
+    outs:
+      - models/xgboost_h24.joblib
+      - models/xgboost_h48.joblib
+      - models/lightgbm_h24.joblib
+      - models/lightgbm_h48.joblib
+    metrics:
+      - reports/metrics/xgboost.json:
+          cache: false
+      - reports/metrics/lightgbm.json:
+          cache: false
+
+  train_patchtst:
+    cmd: python -m src.models.patchtst
+    deps:
+      - src/models/patchtst.py
+      - src/models/patchtst_pyfunc.py
+      - src/evaluate/metrics.py
+      - data/processed
+    params:
+      - patchtst
+      - split
+      - features.horizons
+    outs:
+      - models/patchtst
+    metrics:
+      - reports/metrics/patchtst.json:
+          cache: false
+
+  evaluate:
+    cmd: python -m src.evaluate.evaluate
+    deps:
+      - src/evaluate/evaluate.py
+      - reports/metrics/persistence.json
+      - reports/metrics/ridge.json
+      - reports/metrics/xgboost.json
+      - reports/metrics/lightgbm.json
+      - reports/metrics/patchtst.json
+    params:
+      - registry
+    outs:
+      - reports/comparison.csv:
+          cache: false
+    metrics:
+      - reports/metrics.json:
+          cache: false

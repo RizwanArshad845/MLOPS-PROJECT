@@ -1,0 +1,35 @@
+# secrets
+.env
+.dvc/config.local
+
+# data & models are versioned by DVC, never git
+/data/
+/models/
+*.parquet
+*.joblib
+*.pt
+*.pkl
+*.safetensors
+
+# generated reports (metrics json files are kept by DVC, plots go to MLflow)
+/reports/plots/
+/reports/artifacts/
+
+# MLflow local fallback
+mlruns/
+mlartifacts/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/
